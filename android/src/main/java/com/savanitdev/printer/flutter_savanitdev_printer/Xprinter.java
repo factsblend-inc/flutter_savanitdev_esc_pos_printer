@@ -704,6 +704,22 @@ public class Xprinter {
                     }
                     rety = 0;
                     switch (status) {
+                        case 0:
+                            // Normal status - printer is ready
+                            resultStatus.setResult(result,true);
+                            break;
+                        case 1:
+                            // Drawer open signal
+                            resultStatus.setResultErrorMethod(result,"Drawer is open");
+                            break;
+                        case 2:
+                            // Offline status
+                            resultStatus.setResultErrorMethod(result,"Printer is offline");
+                            break;
+                        case 4:
+                            // Paper feed error
+                            resultStatus.setResultErrorMethod(result,"Paper feed error");
+                            break;
                         case 8:
                             resultStatus.setResultErrorMethod(result,StatusPrinter.STS_COVEROPEN);
                             break;
@@ -716,8 +732,32 @@ public class Xprinter {
                         case 64:
                             resultStatus.setResultErrorMethod(result,StatusPrinter.STS_PRINTER_ERR);
                             break;
+                        case 128:
+                            // Cutter error
+                            resultStatus.setResultErrorMethod(result,"Cutter error");
+                            break;
+                        case 256:
+                            // Recoverable error
+                            resultStatus.setResultErrorMethod(result,"Recoverable error occurred");
+                            break;
                         default:
+                            // Handle negative values and unknown status codes
+                            if (status < 0) {
+                                if (status == -4 || status == -65) {
+                                    // Connection lost or communication error
+                                    resultStatus.setResultErrorMethod(result,StatusPrinter.PRINTER_DISCONNECT);
+                                } else {
+                                    // Other negative values indicate communication errors
+                                    resultStatus.setResultErrorMethod(result,"Communication error: " + status);
+                                }
+                            } else if (status > 0) {
+                                // Unknown positive status - log it but treat as success for compatibility
+                                Log.w("status", "Unknown printer status code: " + status);
                                 resultStatus.setResult(result,true);
+                            } else {
+                                // This should not happen (status == 0 is handled above)
+                                resultStatus.setResult(result,true);
+                            }
                             break;
                     }
                 });
