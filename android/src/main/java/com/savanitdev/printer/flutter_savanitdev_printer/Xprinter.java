@@ -636,6 +636,11 @@ public class Xprinter {
                     return;
                 }
                 if (connection.isConnect()) {
+                    boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer,isDelay, result,maxRetry,retry);
+                    if(!isPrinterReady){
+                        resultStatus.setResultErrorMethod(result,StatusPrinter.RETRY_FAILED);
+                        return;
+                    }
                     POSPrinter printer = new POSPrinter(connection);
                     byte[] bytes = Base64.decode(iniCommand, Base64.DEFAULT);
                     byte[] endBytes = Base64.decode(cutterCommands, Base64.DEFAULT);
@@ -674,6 +679,26 @@ public class Xprinter {
             }
 
     }
+
+    private boolean isPrinterReady(boolean isDisconnect,String address, POSPrinter printer,boolean isDelay, @NonNull MethodChannel.Result result,{int maxRetry,int retry}) {
+        try {
+            if(retry < maxRetry){
+                retry++;
+                return isPrinterReady(isDisconnect, address, printer,isDelay, result,maxRetry,retry);
+            }else{
+                return false;
+            }
+            status(isDisconnect, address, printer,isDelay, result);
+            if(resultStatus.isResult()){
+                return true;
+            }else{
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public void printWithBufferCheck(POSPrinter printer, @NonNull MethodChannel.Result result) {
         executor.submit(() -> {
         try {
