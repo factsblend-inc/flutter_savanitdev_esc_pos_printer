@@ -21,15 +21,7 @@ import androidx.annotation.NonNull;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.LogPrinter;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.ResultStatus;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.StatusPrinter;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+
 import java.util.ArrayList;
 import net.posprinter.CPCLPrinter;
 import net.posprinter.IDeviceConnection;
@@ -57,8 +49,8 @@ public class Xprinter {
 
     private ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Map<String, IDeviceConnection> connections = new HashMap<>();
-    int rety = 0;
-    int maxRety = 3;
+    int retry = 0;
+    int maxRetry = 3;
     Context contextX;
     ResultStatus resultStatus = new ResultStatus();
 
@@ -648,7 +640,7 @@ public class Xprinter {
                 return;
             }
             if (connection.isConnect()) {
-                boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRetry, retry);
+                boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRety, rety);
                 if (!isPrinterReady) {
                     resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED);
                     return;
@@ -692,13 +684,7 @@ public class Xprinter {
 
     }
 
-    private boolean isPrinterReady(boolean isDisconnect, String address, POSPrinter printer, boolean isDelay, @NonNull MethodChannel.Result result,  {
-        int maxRetry,
-        int retry
-    }
-
-    
-        ) {
+    private boolean isPrinterReady(boolean isDisconnect, String address, POSPrinter printer, boolean isDelay, @NonNull MethodChannel.Result result, int maxRetry, int retry) {
         try {
             status(isDisconnect, address, printer, isDelay, result);
             if (resultStatus.isResult()) {
