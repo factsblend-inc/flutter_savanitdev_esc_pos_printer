@@ -9,8 +9,10 @@ import java.util.Map;
 import io.flutter.plugin.common.MethodChannel;
 
 public class ResultStatus {
+
     // Add a class-level map to track which results have been replied to
     private final Map<MethodChannel.Result, Boolean> resultReplied = new HashMap<>();
+    private boolean lastResult = false;
 
     private synchronized boolean hasReplied(MethodChannel.Result result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -22,15 +24,18 @@ public class ResultStatus {
     private synchronized void markReplied(MethodChannel.Result result) {
         resultReplied.put(result, true);
     }
-    public void setResult(MethodChannel.Result result,boolean status) {
+
+    public void setResult(MethodChannel.Result result, boolean status) {
         if (!hasReplied(result)) {
             markReplied(result);
             result.success(status);
+            lastResult = status;
         } else {
             Log.w("Xprinter", "Attempted to reply to an already replied result with success");
         }
     }
-    public void setResultMethod(MethodChannel.Result result,Object value) {
+
+    public void setResultMethod(MethodChannel.Result result, Object value) {
         if (!hasReplied(result)) {
             markReplied(result);
             result.success(value);
@@ -38,13 +43,19 @@ public class ResultStatus {
             Log.w("Xprinter", "Attempted to reply to an already replied result with success");
         }
     }
-    public void setResultErrorMethod(MethodChannel.Result result,String value) {
+
+    public void setResultErrorMethod(MethodChannel.Result result, String value) {
         if (!hasReplied(result)) {
             markReplied(result);
-            result.error(StatusPrinter.ERROR,"call error",value);
+            result.error(StatusPrinter.ERROR, "call error", value);
+            lastResult = false;
         } else {
             Log.w("Xprinter", "Attempted to reply to an already replied result with success");
         }
+    }
+
+    public boolean isResult() {
+        return lastResult;
     }
 
 }

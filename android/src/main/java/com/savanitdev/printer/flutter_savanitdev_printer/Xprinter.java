@@ -254,12 +254,12 @@ public class Xprinter {
     private void connectListener(String address, int code, String portType, @NonNull MethodChannel.Result result) {
         try {
             if (code == POSConnect.CONNECT_SUCCESS) {
-                rety = 0;
+                retry = 0;
                 safeSuccess(result, StatusPrinter.CONNECTED);
             } else {
                 if (code == POSConnect.CONNECT_INTERRUPT || code == POSConnect.CONNECT_FAIL) {
-                    if (rety < maxRety) {
-                        rety++;
+                    if (retry < maxRetry) {
+                        retry++;
                         // Use a handler instead of direct recursion to avoid stack overflow
                         // We need to be careful not to reply multiple times to the same result
                         new Handler(Looper.getMainLooper()).post(() -> {
@@ -269,7 +269,7 @@ public class Xprinter {
                             }
                         });
                     } else {
-                        rety = 0; // Reset retry counter
+                        retry = 0; // Reset retry counter
                         safeError(result, StatusPrinter.ERROR, StatusPrinter.RETRY_FAILED, StatusPrinter.RETRY_FAILED3);
                     }
                 } else {
@@ -298,7 +298,7 @@ public class Xprinter {
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-                rety = 0;
+                retry = 0;
                 switch (status) {
                     case 0:
                         msg = "STS_NORMAL";
@@ -381,7 +381,7 @@ public class Xprinter {
                                 String msg = "";
                                 try {
                                     // Don't close the connection here
-                                    rety = 0;
+                                    retry = 0;
                                     switch (status) {
                                         case 0:
                                             msg = "STS_NORMAL";
@@ -612,15 +612,15 @@ public class Xprinter {
     private void listener(String address, int code, String portType, boolean isCloseConnection, @NonNull MethodChannel.Result result) {
         try {
             if (code == POSConnect.CONNECT_SUCCESS) {
-                rety = 0;
+                retry = 0;
                 resultStatus.setResult(result, true);
             } else {
                 if (code == POSConnect.CONNECT_INTERRUPT || code == POSConnect.CONNECT_FAIL) {
-                    if (rety < maxRety) {
-                        rety++;
+                    if (retry < maxRetry) {
+                        retry++;
                         connect(address, portType, isCloseConnection, result);
                     } else {
-                        rety = 0; // Reset retry counter
+                        retry = 0; // Reset retry counter
                         resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED3);
                     }
                 } else {
@@ -640,12 +640,12 @@ public class Xprinter {
                 return;
             }
             if (connection.isConnect()) {
-                boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRety, rety);
+                POSPrinter printer = new POSPrinter(connection);
+                boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRetry, retry);
                 if (!isPrinterReady) {
                     resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED);
                     return;
                 }
-                POSPrinter printer = new POSPrinter(connection);
                 byte[] bytes = Base64.decode(iniCommand, Base64.DEFAULT);
                 byte[] endBytes = Base64.decode(cutterCommands, Base64.DEFAULT);
                 byte[] encodeBytes = Base64.decode(encode, Base64.DEFAULT);
@@ -686,8 +686,46 @@ public class Xprinter {
 
     private boolean isPrinterReady(boolean isDisconnect, String address, POSPrinter printer, boolean isDelay, @NonNull MethodChannel.Result result, int maxRetry, int retry) {
         try {
-            status(isDisconnect, address, printer, isDelay, result);
-            if (resultStatus.isResult()) {
+            // Create a temporary result holder to capture the status result
+            final boolean[] statusResult = {false};
+            final boolean[] statusComplete = {false};
+
+            // Create a temporary result that captures the status without sending it to the original result
+            MethodChannel.Result tempResult = new MethodChannel.Result() {
+                @Override
+                public void success(Object result) {
+                    statusResult[0] = true;
+                    statusComplete[0] = true;
+                }
+
+                @Override
+                public void error(String errorCode, String errorMessage, Object errorDetails) {
+                    statusResult[0] = false;
+                    statusComplete[0] = true;
+                }
+
+                @Override
+                public void notImplemented() {
+                    statusResult[0] = false;
+                    statusComplete[0] = true;
+                }
+            };
+
+            // Check status using temporary result
+            status(isDisconnect, address, printer, isDelay, tempResult);
+
+            // Wait for status check to complete (with timeout)
+            long startTime = System.currentTimeMillis();
+            while (!statusComplete[0] && (System.currentTimeMillis() - startTime) < 3000) { // 3 second timeout
+                try {
+                    Thread.sleep(50); // Small delay to avoid busy waiting
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+
+            if (statusComplete[0] && statusResult[0]) {
                 return true;
             } else {
                 // Status is not normal, retry if we haven't exceeded max retries
@@ -732,7 +770,7 @@ public class Xprinter {
                     resultStatus.setResultErrorMethod(result, "error :" + e);
                     throw new RuntimeException(e);
                 }
-                rety = 0;
+                retry = 0;
                 switch (status) {
                     case 0:
                         // Normal status - printer is ready
