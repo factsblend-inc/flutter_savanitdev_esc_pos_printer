@@ -641,11 +641,11 @@ public class Xprinter {
             }
             if (connection.isConnect()) {
                 POSPrinter printer = new POSPrinter(connection);
-                boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRetry, retry);
-                if (!isPrinterReady) {
-                    resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED);
-                    return;
-                }
+                // boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRetry, retry);
+                // if (!isPrinterReady) {
+                //     resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED);
+                //     return;
+                // }
                 byte[] bytes = Base64.decode(iniCommand, Base64.DEFAULT);
                 byte[] endBytes = Base64.decode(cutterCommands, Base64.DEFAULT);
                 byte[] encodeBytes = Base64.decode(encode, Base64.DEFAULT);
