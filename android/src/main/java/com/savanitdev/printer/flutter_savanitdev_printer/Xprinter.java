@@ -776,6 +776,14 @@ public class Xprinter {
                         // Normal status - printer is ready
                         resultStatus.setResult(result, true);
                         break;
+                    case -3:
+                        // On imin is sussess
+                        resultStatus.setResult(result, true);
+                        break;
+                    case -4:
+                        // On imin is sussess
+                        resultStatus.setResult(result, true);
+                        break;
                     case 1:
                         // Drawer open signal
                         resultStatus.setResultErrorMethod(result, "Drawer is open");
@@ -811,7 +819,7 @@ public class Xprinter {
                     default:
                         // Handle negative values and unknown status codes
                         if (status < 0) {
-                            if (status == -4 || status == -65) {
+                            if (status == -65) { // -4 is not used
                                 // Connection lost or communication error
                                 resultStatus.setResultErrorMethod(result, StatusPrinter.PRINTER_DISCONNECT);
                             } else {
