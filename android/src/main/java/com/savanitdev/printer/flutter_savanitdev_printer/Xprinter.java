@@ -20,6 +20,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.LogPrinter;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.ResultStatus;
+import com.savanitdev.printer.flutter_savanitdev_printer.utils.XprinterResultStatus;
 import com.savanitdev.printer.flutter_savanitdev_printer.utils.StatusPrinter;
 
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class Xprinter {
     int maxRetry = 3;
     Context contextX;
     ResultStatus resultStatus = new ResultStatus();
+    XprinterResultStatus xprinterResultStatus = new XprinterResultStatus();
 
     // Add a class-level map to track which results have been replied to
     private final Map<MethodChannel.Result, Boolean> resultReplied = new HashMap<>();
@@ -636,14 +638,14 @@ public class Xprinter {
         try {
             IDeviceConnection connection = connections.get(address);
             if (connection == null) {
-                resultStatus.setResultErrorMethod(result, StatusPrinter.CONNECT_ERROR);
+                xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_CONNECTION_ERROR);
                 return;
             }
             if (connection.isConnect()) {
                 POSPrinter printer = new POSPrinter(connection);
                 // boolean isPrinterReady = isPrinterReady(isDisconnect, address, printer, isDelay, result, maxRetry, retry);
                 // if (!isPrinterReady) {
-                //     resultStatus.setResultErrorMethod(result, StatusPrinter.RETRY_FAILED);
+                //     xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_PRINT_FAILED);
                 //     return;
                 // }
                 byte[] bytes = Base64.decode(iniCommand, Base64.DEFAULT);
@@ -671,15 +673,15 @@ public class Xprinter {
                     Thread.sleep(500);
                 }
                 if (isDevicePOS) {
-                    printWithBufferCheck(printer, result);
+                    printWithBufferCheckReturnStatus(printer, result);
                 } else {
-                    status(isDisconnect, address, printer, isDelay, result);
+                    statusReturnCode(isDisconnect, address, printer, isDelay, result);
                 }
             } else {
-                resultStatus.setResultErrorMethod(result, StatusPrinter.CONNECT_ERROR);
+                xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_CONNECTION_ERROR);
             }
         } catch (Exception e) {
-            resultStatus.setResultErrorMethod(result, StatusPrinter.PRINT_FAIL);
+            xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_PRINT_FAILED);
         }
 
     }
@@ -839,6 +841,45 @@ public class Xprinter {
             });
         } catch (Exception e) {
             resultStatus.setResultErrorMethod(result, "status :" + e);
+        }
+    }
+
+    public void printWithBufferCheckReturnStatus(POSPrinter printer, @NonNull MethodChannel.Result result) {
+        executor.submit(() -> {
+            try {
+                byte[] command = {0x1B, 0x40}; // ESC @ (initialize)
+                printer.sendData(command).feedLine(0);
+                System.out.println("status printing success");
+                xprinterResultStatus.setResultWithStatusCode(result, StatusPrinter.STATUS_SUCCESS);
+            } catch (Exception e) {
+                System.out.println("status printing error: " + e.getMessage());
+                xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_PRINT_FAILED);
+            }
+        });
+    }
+
+    public void statusReturnCode(boolean isDisconnect, String address, POSPrinter printer, boolean isDelay, @NonNull MethodChannel.Result result) {
+        try {
+            printer.printerStatus(status -> {
+                Log.d("status ", "status printing ========> " + status);
+                try {
+                    if (isDisconnect) {
+                        if (isDelay) {
+                            Thread.sleep(500);
+                        }
+                        checkInitConnection(address);
+                    }
+                } catch (InterruptedException e) {
+                    xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_COMMUNICATION_ERROR);
+                    return;
+                }
+                retry = 0;
+
+                // Use the helper method to map status and set result
+                xprinterResultStatus.setResultFromPrinterStatus(result, status);
+            });
+        } catch (Exception e) {
+            xprinterResultStatus.setResultErrorWithStatusCode(result, StatusPrinter.STATUS_COMMUNICATION_ERROR);
         }
     }
 

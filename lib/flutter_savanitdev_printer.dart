@@ -20,7 +20,7 @@ class FlutterSavanitdevPrinter {
         .disconnect(address, timeout);
   }
 
-  Future<bool> printCommand(
+  Future<int> printCommand(
       {String address = "",
       String iniCommand = "",
       String cutterCommands = "",

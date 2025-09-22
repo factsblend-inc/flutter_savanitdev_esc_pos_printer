@@ -31,7 +31,7 @@ abstract class FlutterSavanitdevPrinterPlatform extends PlatformInterface {
   Future<bool> connect(
       String address, String type, bool isCloseConnection, int timeout);
   Future<bool> disconnect(String address, int timeout);
-  Future<bool> printCommand(
+  Future<int> printCommand(
       {String address = "",
       String iniCommand = "",
       String cutterCommands = "",

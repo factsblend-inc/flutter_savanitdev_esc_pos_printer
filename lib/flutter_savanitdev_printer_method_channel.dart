@@ -93,7 +93,7 @@ class MethodChannelFlutterSavanitdevPrinter
   }
 
   @override
-  Future<bool> printCommand({
+  Future<int> printCommand({
     String address = "",
     String iniCommand = "",
     String cutterCommands = "",
@@ -107,7 +107,7 @@ class MethodChannelFlutterSavanitdevPrinter
     int width = 576,
   }) async {
     try {
-      final version = await methodChannel.invokeMethod('printCommand', {
+      final int version = await methodChannel.invokeMethod('printCommand', {
         'address': address,
         'iniCommand': iniCommand,
         'cutterCommands': cutterCommands,
@@ -127,9 +127,9 @@ class MethodChannelFlutterSavanitdevPrinter
       );
       return version;
     } on TimeoutException catch (e) {
-      return false;
+      return -99;
     } catch (e) {
-      return false;
+      return -100;
     }
   }
 
