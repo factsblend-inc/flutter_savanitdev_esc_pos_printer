@@ -25,7 +25,31 @@ class PrinterManager {
 }
 
 public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, WIFIConnecterDelegate, CBCentralManagerDelegate, FlutterPlugin, POSBLEManagerDelegate {
-
+    
+    /*
+     * Status Codes for ALL methods (connect, disconnect, printCommand):
+     * 
+     * Success:
+     *   0 = Success / Ready
+     *
+     * Positive values (1-255): For printCommand only - Actual printer status byte from hardware
+     *   Values depend on printer model specifications
+     *
+     * Negative values: Error codes
+     *   -1   = Printer not found
+     *   -2   = No response from printer
+     *   -3   = Empty address
+     *   -4   = Invalid image data (base64 decode failed)
+     *   -5   = Cannot create image from data
+     *   -6   = Bluetooth not enabled
+     *   -7   = BLE write error
+     *   -8   = BLE receive error
+     *   -9   = WiFi disconnect error
+     *   -10  = BLE device not found in scan list
+     *   -11  = BLE connect failed
+     *   -99  = Timeout (from Dart side)
+     *   -100 = General exception / Invalid arguments (from Dart side or Swift)
+     */
 
     var rssiList: [NSNumber] = []
     var dataArr: [CBPeripheral] = []
@@ -87,7 +111,7 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
             case "printCommand":
                 guard let address = args["address"] as? String
                 else {
-                    self.callResult(false)
+                    self.callResultInt(-3) // Empty address
                     return
                 }
                 let encode = args["encode"] as! String
@@ -117,7 +141,15 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
         }
     }
     
-    // Helper to ensure resultMethod is called only once
+    // Helper to ensure resultMethod is called only once with Int
+    // All methods return int: 0 = success, negative values = error codes
+    private func callResultInt(_ value: Int) {
+        guard !hasResultBeenCalled, let result = resultMethod else { return }
+        hasResultBeenCalled = true
+        result(value)
+        resultMethod = nil
+    }
+
     private func callResult(_ value: Bool) {
         guard !hasResultBeenCalled, let result = resultMethod else { return }
         hasResultBeenCalled = true
@@ -243,7 +275,7 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
     func printCommand(_ address: String, iniCommand: String, cutterCommands: String,
                       encode: String, img: String, isCut: Bool, isDisconnect: Bool, isDevicePOS: Bool) {
         if(address.isEmpty){
-            callResult(false)
+            callResultInt(-3) // Empty address
             return
         }
         var concatenatedData = Data([0x1d, 0x72, 0x01])
@@ -258,8 +290,8 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
             concatenatedData.append(Data(base64Encoded: iniCommand)!)
         }
         if(!img.isEmpty){
-            guard let imageData = Data(base64Encoded: img) else { return callResult(false) }
-            guard let image = UIImage(data: imageData) else { return callResult(false)}
+            guard let imageData = Data(base64Encoded: img) else { return callResultInt(-4) } // Invalid image data
+            guard let image = UIImage(data: imageData) else { return callResultInt(-5) } // Cannot create image
             let imgEncode = self.monoImg(image: image, threshold: 0.1)
             if isValidIPAddress(address) {
                 concatenatedData.append(POSCommand.printRasteBmp(withM: RasterNolmorWH, andImage: imgEncode, andType: Dithering))
@@ -295,7 +327,7 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
     @objc
     func printByteNet(_ address: String, data: Data) {
         guard let printer = printerManager.getPrinter(id: address) else {
-            callResult(false)
+            callResultInt(-1) // Printer not found
             return
         }
         printer.writeCommand(with: data)
@@ -305,7 +337,7 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
     @objc
     func printByteBLE(_ data: Data) {
         guard statusBLE else {
-            callResult(false)
+            callResultInt(-6) // Bluetooth not enabled
             return
         }
         sleep(2)
@@ -318,18 +350,22 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
     @objc
     func statusXprinter(address: String) {
         guard let printer = printerManager.getPrinter(id: address) else {
-            callResult(false)
+            callResultInt(-1) // Printer not found
             return
         }
         sleep(1)
         printer.printerStatus { [weak self] (responseData: Data?) in
             DispatchQueue.main.async {
-                guard let data = responseData, let byte = [UInt8](data).first, byte == 0 else {
-                    self?.callResult(false)
+                guard let data = responseData, let byte = [UInt8](data).first else {
+                    self?.callResultInt(-2) // No response from printer
                     printer.disconnect()
                     return
                 }
-                self?.callResult(true)
+                print("status ===> \(byte)")
+                
+                // Return the actual printer status byte
+                self?.callResultInt(Int(byte))
+                
                 if(self?.isDisconnectPrinter == true){
                     printer.disconnect()
                 }
@@ -343,11 +379,14 @@ public class FlutterSavanitdevPrinterPlugin: NSObject, POSWIFIManagerDelegate, W
     func statusBTXprinter() {
         btManager.printerStatus { [weak self] (responseData: Data?) in
         
-                       guard let data = responseData, let byte = [UInt8](data).first, byte == 0 || byte == 18 else {
-                           self?.callResult(false)
+                       guard let data = responseData, let byte = [UInt8](data).first else {
+                           self?.callResultInt(-2) // No response from printer
                            return
                        }
                        print("status ===> \(byte.description)")
+                       
+                       // Return the actual printer status byte
+                       self?.callResultInt(Int(byte))
                      
 //                   if(self?.isDisconnectPrinter == true){
 //                    self?.btManager.disconnectRootPeripheral()
